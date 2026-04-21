@@ -19,6 +19,13 @@ int object_write(const char *type, const void *data, size_t size, ObjectID *id_o
 
     compute_hash(buffer, total_size, id_out);
 
+    // Deduplication check
+    if (object_exists(id_out)) {
+        free(buffer);
+        return 0;
+    }
+
+    // Paths
     char path[256];
     object_path(id_out, path, sizeof(path));
 
@@ -40,9 +47,7 @@ int object_write(const char *type, const void *data, size_t size, ObjectID *id_o
 
     free(buffer);
     return 0;
-}
-
-int object_read(const ObjectID *id, char **data_out, size_t *size_out) {
+}int object_read(const ObjectID *id, char **data_out, size_t *size_out) {
     char path[256];
     object_path(id, path, sizeof(path));
 
