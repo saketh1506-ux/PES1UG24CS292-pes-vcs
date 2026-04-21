@@ -67,30 +67,38 @@ int object_exists(const ObjectID *id) {
 
 int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out) {
 
-    // Step 1: Create header
-    char header[64];
-    int header_len = sprintf(header, "blob %zu", len) + 1;
+    // Step 1: Convert type to string
+    const char *type_str;
+    if (type == OBJ_BLOB) type_str = "blob";
+    else if (type == OBJ_TREE) type_str = "tree";
+    else type_str = "commit";
 
-    // Step 2: Combine header + data
+    // Step 2: Create header
+    char header[64];
+    int header_len = sprintf(header, "%s %zu", type_str, len) + 1;
+
+    // Step 3: Combine header + data
     size_t total_len = header_len + len;
     unsigned char *full = malloc(total_len);
-    memcpy(full, header, header_len);
+
+    memcpy(full, header, header_len - 1);
+    full[header_len - 1] = '\0';   // VERY IMPORTANT
     memcpy(full + header_len, data, len);
 
-    // Step 3: Compute hash
+    // Step 4: Compute hash
     compute_hash(full, total_len, id_out);
 
-    // Step 4: Check if already exists
+    // Step 5: Deduplication
     if (object_exists(id_out)) {
         free(full);
         return 0;
     }
 
-    // Step 5: Get correct path using PROVIDED function
+    // Step 6: Path
     char path[512];
     object_path(id_out, path, sizeof(path));
 
-    // Step 6: Create directories
+    // Step 7: Create directories
     mkdir(".pes", 0755);
     mkdir(".pes/objects", 0755);
 
@@ -102,7 +110,7 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
         mkdir(dir, 0755);
     }
 
-    // Step 7: Temp file
+    // Step 8: Write temp file
     char temp_path[600];
     sprintf(temp_path, "%s.tmp", path);
 
@@ -116,13 +124,12 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
     fsync(fd);
     close(fd);
 
-    // Step 8: Rename
+    // Step 9: Rename
     rename(temp_path, path);
 
     free(full);
     return 0;
 }
-
 // Read an object from the store.
 //
 // Steps:
